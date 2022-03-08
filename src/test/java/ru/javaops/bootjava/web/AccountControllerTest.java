@@ -30,7 +30,7 @@ class AccountControllerTest extends AbstractControllerTest {
                 .andExpect(status().isOk())
                 .andDo(print())
                 .andExpect(content().contentTypeCompatibleWith(MediaTypes.HAL_JSON_VALUE))
-                .andExpect(jsonMatcher(user, UserTestUtil::assertEquals));
+                .andExpect(jsonMatcher(user, UserTestUtil::assertNoIdEquals));
     }
 
     @Test
@@ -51,14 +51,11 @@ class AccountControllerTest extends AbstractControllerTest {
     @Test
     void register() throws Exception {
         User newUser = UserTestUtil.getNew();
-        User registered = asUser(perform(MockMvcRequestBuilders.post(URL + "/register")
+        User registered = asUser(perform(MockMvcRequestBuilders.post(URL)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(writeValue(newUser)))
                 .andExpect(status().isCreated()).andReturn());
-        int newId = registered.id();
-        newUser.setId(newId);
-        UserTestUtil.assertEquals(registered, newUser);
-        UserTestUtil.assertEquals(registered, userRepository.findById(newId).orElseThrow());
+        UserTestUtil.assertNoIdEquals(registered, newUser);
     }
 
     @Test
@@ -71,5 +68,17 @@ class AccountControllerTest extends AbstractControllerTest {
                 .andDo(print())
                 .andExpect(status().isNoContent());
         UserTestUtil.assertEquals(updated, userRepository.findById(USER_ID).orElseThrow());
+    }
+
+    @Test
+    @WithUserDetails(value = USER_MAIL)
+    void updateHtmlUnsafe() throws Exception {
+        User updated = UserTestUtil.getUpdated();
+        updated.setFirstName("<script>alert(123)</script>");
+        perform(MockMvcRequestBuilders.put(URL)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(writeValue(updated)))
+                .andDo(print())
+                .andExpect(status().isUnprocessableEntity());
     }
 }
